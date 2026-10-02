@@ -34,26 +34,35 @@ add_action( 'admin_menu', 'linkahead_admin_menu' );
  * @return array[] Rows with source, text and target.
  */
 function linkahead_collect() {
-	$ids   = linkahead_search_content( 'data-link-ahead=', LINKAHEAD_REPORT_LIMIT );
-	$posts = array_filter( array_map( 'get_post', $ids ) );
+	$anchors    = linkahead_search_content( 'data-link-ahead=', LINKAHEAD_REPORT_LIMIT );
+	$shortcodes = linkahead_search_content( '[link_ahead', LINKAHEAD_REPORT_LIMIT );
+	$ids        = array_values( array_unique( array_merge( $anchors, $shortcodes ) ) );
+	$posts      = array_filter( array_map( 'get_post', $ids ) );
 
 	$rows = array();
 	foreach ( $posts as $post ) {
 		if ( ! current_user_can( 'edit_post', $post->ID ) ) {
 			continue;
 		}
-		if ( ! preg_match_all( '~<a\b[^>]*\bdata-link-ahead="(\d+)"[^>]*>(.*?)</a>~is', $post->post_content, $found, PREG_SET_ORDER ) ) {
-			continue;
+		$found = array();
+		if ( preg_match_all( '~<a\b[^>]*\bdata-link-ahead="(\d+)"[^>]*>(.*?)</a>~is', $post->post_content, $matches, PREG_SET_ORDER ) ) {
+			foreach ( $matches as $match ) {
+				$found[] = array(
+					'target' => (int) $match[1],
+					'text'   => $match[2],
+				);
+			}
 		}
-		foreach ( $found as $match ) {
+		foreach ( array_merge( $found, linkahead_shortcode_placeholders( $post->post_content ) ) as $placeholder ) {
 			$rows[] = array(
 				'source' => (int) $post->ID,
-				'text'   => wp_strip_all_tags( $match[2] ),
-				'target' => (int) $match[1],
+				'text'   => wp_strip_all_tags( $placeholder['text'] ),
+				'target' => (int) $placeholder['target'],
 			);
 		}
 	}
-	return array( $rows, count( $ids ) >= LINKAHEAD_REPORT_LIMIT );
+	$truncated = count( $anchors ) >= LINKAHEAD_REPORT_LIMIT || count( $shortcodes ) >= LINKAHEAD_REPORT_LIMIT;
+	return array( $rows, $truncated );
 }
 
 /**
@@ -77,6 +86,8 @@ function linkahead_target_state( $target_id ) {
 			);
 		case 'trash':
 			return array( 'label' => __( 'In trash – stays text', 'link-ahead' ) );
+		case 'private':
+			return array( 'label' => __( 'Private – stays text', 'link-ahead' ) );
 		case 'draft':
 		case 'pending':
 			return array( 'label' => __( 'Not scheduled yet', 'link-ahead' ) );
@@ -118,15 +129,19 @@ function linkahead_render_report() {
 				</tr></thead>
 				<tbody>
 				<?php foreach ( $rows as $row ) : ?>
-					<?php $state = linkahead_target_state( $row['target'] ); ?>
+					<?php
+					// Visitors of a translated post get the translation in its language, so its state counts.
+					$target = linkahead_translated_id( $row['target'], $row['source'] );
+					$state  = linkahead_target_state( $target );
+					?>
 					<tr>
 						<td><a href="<?php echo esc_url( (string) get_edit_post_link( $row['source'] ) ); ?>"><?php echo esc_html( get_the_title( $row['source'] ) ); ?></a></td>
 						<td><?php echo esc_html( $row['text'] ); ?></td>
 						<td>
-							<?php if ( get_post( $row['target'] ) && current_user_can( 'edit_post', $row['target'] ) ) : ?>
-								<a href="<?php echo esc_url( (string) get_edit_post_link( $row['target'] ) ); ?>"><?php echo esc_html( get_the_title( $row['target'] ) ); ?></a>
+							<?php if ( get_post( $target ) && current_user_can( 'edit_post', $target ) ) : ?>
+								<a href="<?php echo esc_url( (string) get_edit_post_link( $target ) ); ?>"><?php echo esc_html( get_the_title( $target ) ); ?></a>
 							<?php else : ?>
-								<?php echo esc_html( '#' . $row['target'] ); ?>
+								<?php echo esc_html( '#' . $target ); ?>
 							<?php endif; ?>
 						</td>
 						<td><?php echo esc_html( $state['label'] ); ?></td>

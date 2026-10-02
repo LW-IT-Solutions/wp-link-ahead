@@ -20,7 +20,7 @@ Link Ahead solves this with a placeholder link:
 * Until the target is published, visitors see plain text. The address of the unpublished post is never output.
 * From the moment the target is published, the same text is a normal link to it.
 * With Polylang or WPML, a placeholder resolves to the translation in the language of the current post.
-* **Tools → Link Ahead** lists every placeholder with its source post and the current state of the target: scheduled, published, still a draft, in the trash or missing.
+* **Tools → Link Ahead** lists every placeholder, including shortcodes, with its source post and the current state of the target in the language of that post: scheduled, published, still a draft, private, in the trash or missing.
 
 = How it works =
 
@@ -28,15 +28,15 @@ The editor stores `<a class="link-ahead" data-link-ahead="123">text</a>`. An anc
 
 Because the placeholder is ordinary markup, deactivating the plugin does not break anything: the text simply stays unlinked. The plugin stores no options and no data of its own.
 
-For the classic editor there is a shortcode: `[link_ahead id="123"]link text[/link_ahead]`.
+For the classic editor there is a shortcode: `[link_ahead id="123"]link text[/link_ahead]`. Unlike the block editor markup, a shortcode shows as plain shortcode text while the plugin is deactivated.
 
 = Page caches =
 
-A page cache may still hold the old copy of a linking post, with plain text where the link should now be. When a target is published, Link Ahead therefore:
+A page cache may still hold the old copy of a linking post, with plain text where the link should now be, or with a link to a target that was unpublished again. When a target is published, or a published target is set back to draft, private, scheduled or trash, Link Ahead therefore:
 
 * clears the object cache of every post that links to it,
 * asks these page caches to purge the linking posts, if they are active: LiteSpeed Cache, WP Super Cache, W3 Total Cache, WP Rocket, WP Fastest Cache and Cache Enabler (only their public purge functions or actions are used),
-* fires the action `link_ahead_target_published( $post_id, $linking_ids )`, so other caches can purge exactly those pages. The action only fires if at least one post links to the target.
+* fires the action `link_ahead_target_published( $post_id, $linking_ids )`, or `link_ahead_target_unpublished( $post_id, $linking_ids )`, so other caches can purge exactly those pages. The actions only fire if at least one post links to the target.
 
 Many caching plugins already clear more than the published post itself when something is published (WP Super Cache does in its default settings). The purge above covers setups that only clear the published post. It can be switched off with `add_filter( 'link_ahead_purge_page_caches', '__return_false' );`.
 

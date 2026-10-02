@@ -129,7 +129,46 @@ function linkahead_find_linking_posts( array $target_ids, $limit = 200 ) {
 		$found = array_merge( $found, linkahead_search_content( 'data-link-ahead="' . $target_id . '"', $limit ) );
 	}
 
+	// Shortcode placeholders can quote the ID in any way, so they are matched after parsing.
+	foreach ( linkahead_search_content( '[link_ahead', $limit ) as $post_id ) {
+		$targets = wp_list_pluck( linkahead_shortcode_placeholders( (string) get_post_field( 'post_content', $post_id ) ), 'target' );
+		if ( array_intersect( $target_ids, $targets ) ) {
+			$found[] = $post_id;
+		}
+	}
+
 	return array_slice( array_values( array_unique( $found ) ), 0, $limit );
+}
+
+/**
+ * Placeholders written as [link_ahead id="123"]text[/link_ahead].
+ *
+ * @param string $content Post content.
+ * @return array[] Each with target ID and link text.
+ */
+function linkahead_shortcode_placeholders( $content ) {
+	$found = array();
+	if ( false === strpos( $content, '[link_ahead' ) ) {
+		return $found;
+	}
+	if ( ! preg_match_all( '/' . get_shortcode_regex( array( 'link_ahead' ) ) . '/s', $content, $matches, PREG_SET_ORDER ) ) {
+		return $found;
+	}
+	foreach ( $matches as $match ) {
+		// [[link_ahead]] is an escaped shortcode and prints as text.
+		if ( '[' === $match[1] && ']' === $match[6] ) {
+			continue;
+		}
+		$atts = shortcode_parse_atts( $match[3] );
+		$id   = is_array( $atts ) && isset( $atts['id'] ) ? absint( $atts['id'] ) : 0;
+		if ( $id ) {
+			$found[] = array(
+				'target' => $id,
+				'text'   => $match[5],
+			);
+		}
+	}
+	return $found;
 }
 
 /**
@@ -176,15 +215,18 @@ function linkahead_translation_ids( $post_id ) {
 }
 
 /**
- * When a target is published, clear the object cache of the posts that link to it
- * and tell caching plugins about it.
+ * When a target is published, or a published target is unpublished, clear the
+ * object cache of the posts that link to it and tell caching plugins about it.
+ * Otherwise a cached page keeps plain text after publication, or a link to a
+ * page that no longer exists after unpublishing.
  *
  * @param string  $new_status New status.
  * @param string  $old_status Old status.
  * @param WP_Post $post       Post object.
  */
 function linkahead_on_publish( $new_status, $old_status, $post ) {
-	if ( 'publish' !== $new_status || 'publish' === $old_status || ! $post instanceof WP_Post ) {
+	$published = 'publish' === $new_status;
+	if ( $published === ( 'publish' === $old_status ) || ! $post instanceof WP_Post ) {
 		return;
 	}
 	$linking = linkahead_find_linking_posts( linkahead_translation_ids( $post->ID ) );
@@ -195,6 +237,20 @@ function linkahead_on_publish( $new_status, $old_status, $post ) {
 		clean_post_cache( $id );
 	}
 	linkahead_purge_page_caches( $linking );
+
+	if ( ! $published ) {
+		/**
+		 * Fires when a published post that other posts link to through Link Ahead
+		 * is unpublished (draft, private, trash, scheduled again).
+		 *
+		 * Page-cache plugins can use this to purge the pages of $linking_ids.
+		 *
+		 * @param int   $post_id     The unpublished post.
+		 * @param int[] $linking_ids Posts that contain a placeholder for it.
+		 */
+		do_action( 'link_ahead_target_unpublished', $post->ID, $linking );
+		return;
+	}
 
 	/**
 	 * Fires when a post is published that other posts link to through Link Ahead.
@@ -212,7 +268,8 @@ add_action( 'transition_post_status', 'linkahead_on_publish', 10, 3 );
  * Purges the cached pages of the linking posts in common page-cache plugins.
  *
  * Only the public purge functions or actions of these plugins are used, each
- * one only if its plugin is active. Other caches can hook into link_ahead_target_published.
+ * one only if its plugin is active. Other caches can hook into link_ahead_target_published
+ * and link_ahead_target_unpublished.
  *
  * @param int[] $post_ids Posts whose cached pages are outdated.
  */
