@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  * @param int $context_id ID of the post that contains the placeholder, 0 if unknown.
  * @return int
  */
-function linkahead_translated_id( $post_id, $context_id ) {
+function link_ahead_translated_id( $post_id, $context_id ) {
 	if ( $context_id && function_exists( 'pll_get_post' ) && function_exists( 'pll_get_post_language' ) ) {
 		$language = pll_get_post_language( $context_id );
 		if ( $language ) {
@@ -32,8 +32,15 @@ function linkahead_translated_id( $post_id, $context_id ) {
 		}
 	}
 	if ( has_filter( 'wpml_object_id' ) ) {
+		// Language of the post that contains the placeholder; without it, WPML uses the language of the request.
+		$language = null;
+		if ( $context_id ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- documented WPML API filter.
+			$details  = apply_filters( 'wpml_post_language_details', null, $context_id );
+			$language = is_array( $details ) && ! empty( $details['language_code'] ) && is_string( $details['language_code'] ) ? sanitize_key( $details['language_code'] ) : null;
+		}
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- documented WPML API filter.
-		$translated = apply_filters( 'wpml_object_id', $post_id, get_post_type( $post_id ), true );
+		$translated = apply_filters( 'wpml_object_id', $post_id, get_post_type( $post_id ), true, $language );
 		if ( $translated ) {
 			return (int) $translated;
 		}
@@ -47,7 +54,7 @@ function linkahead_translated_id( $post_id, $context_id ) {
  * @param int $post_id Target post ID.
  * @return string
  */
-function linkahead_public_url( $post_id ) {
+function link_ahead_public_url( $post_id ) {
 	$post = get_post( $post_id );
 	if ( ! $post || 'publish' !== $post->post_status || ! is_post_type_viewable( $post->post_type ) ) {
 		return '';
@@ -61,7 +68,7 @@ function linkahead_public_url( $post_id ) {
  * @param string $content Rendered content.
  * @return string
  */
-function linkahead_filter_content( $content ) {
+function link_ahead_filter_content( $content ) {
 	if ( ! is_string( $content ) || false === strpos( $content, 'data-link-ahead' ) ) {
 		return $content;
 	}
@@ -75,7 +82,7 @@ function linkahead_filter_content( $content ) {
 			continue;
 		}
 
-		$url = linkahead_public_url( linkahead_translated_id( (int) $target, $context_id ) );
+		$url = link_ahead_public_url( link_ahead_translated_id( (int) $target, $context_id ) );
 		if ( '' !== $url ) {
 			$tags->set_attribute( 'href', $url );
 			$tags->remove_class( 'link-ahead--pending' );
@@ -88,7 +95,7 @@ function linkahead_filter_content( $content ) {
 
 	return $tags->get_updated_html();
 }
-add_filter( 'the_content', 'linkahead_filter_content', 20 );
+add_filter( 'the_content', 'link_ahead_filter_content', 20 );
 
 /**
  * Shortcode for the classic editor: [link_ahead id="123"]text[/link_ahead].
@@ -97,7 +104,7 @@ add_filter( 'the_content', 'linkahead_filter_content', 20 );
  * @param string|null  $content Link text.
  * @return string
  */
-function linkahead_shortcode( $atts, $content = null ) {
+function link_ahead_shortcode( $atts, $content = null ) {
 	$atts = shortcode_atts( array( 'id' => 0 ), $atts, 'link_ahead' );
 	$id   = absint( $atts['id'] );
 	$text = null === $content ? '' : do_shortcode( $content );
@@ -106,13 +113,13 @@ function linkahead_shortcode( $atts, $content = null ) {
 		return wp_kses_post( $text );
 	}
 
-	$url = linkahead_public_url( linkahead_translated_id( $id, (int) get_the_ID() ) );
+	$url = link_ahead_public_url( link_ahead_translated_id( $id, (int) get_the_ID() ) );
 	if ( '' === $url ) {
 		return '<a class="link-ahead link-ahead--pending" data-link-ahead="' . esc_attr( $id ) . '">' . wp_kses_post( $text ) . '</a>';
 	}
 	return '<a class="link-ahead" data-link-ahead="' . esc_attr( $id ) . '" href="' . esc_url( $url ) . '">' . wp_kses_post( $text ) . '</a>';
 }
-add_shortcode( 'link_ahead', 'linkahead_shortcode' );
+add_shortcode( 'link_ahead', 'link_ahead_shortcode' );
 
 /**
  * Finds posts whose content contains a placeholder for one of the given IDs.
@@ -121,17 +128,17 @@ add_shortcode( 'link_ahead', 'linkahead_shortcode' );
  * @param int   $limit      Maximum number of results.
  * @return int[] Post IDs.
  */
-function linkahead_find_linking_posts( array $target_ids, $limit = 200 ) {
+function link_ahead_find_linking_posts( array $target_ids, $limit = 200 ) {
 	$target_ids = array_filter( array_map( 'absint', $target_ids ) );
 	$found      = array();
 
 	foreach ( $target_ids as $target_id ) {
-		$found = array_merge( $found, linkahead_search_content( 'data-link-ahead="' . $target_id . '"', $limit ) );
+		$found = array_merge( $found, link_ahead_search_content( 'data-link-ahead="' . $target_id . '"', $limit ) );
 	}
 
 	// Shortcode placeholders can quote the ID in any way, so they are matched after parsing.
-	foreach ( linkahead_search_content( '[link_ahead', $limit ) as $post_id ) {
-		$targets = wp_list_pluck( linkahead_shortcode_placeholders( (string) get_post_field( 'post_content', $post_id ) ), 'target' );
+	foreach ( link_ahead_search_content( '[link_ahead', $limit ) as $post_id ) {
+		$targets = wp_list_pluck( link_ahead_shortcode_placeholders( (string) get_post_field( 'post_content', $post_id ) ), 'target' );
 		if ( array_intersect( $target_ids, $targets ) ) {
 			$found[] = $post_id;
 		}
@@ -146,7 +153,7 @@ function linkahead_find_linking_posts( array $target_ids, $limit = 200 ) {
  * @param string $content Post content.
  * @return array[] Each with target ID and link text.
  */
-function linkahead_shortcode_placeholders( $content ) {
+function link_ahead_shortcode_placeholders( $content ) {
 	$found = array();
 	if ( false === strpos( $content, '[link_ahead' ) ) {
 		return $found;
@@ -182,7 +189,7 @@ function linkahead_shortcode_placeholders( $content ) {
  * @param int    $limit  Maximum number of results.
  * @return int[]
  */
-function linkahead_search_content( $needle, $limit ) {
+function link_ahead_search_content( $needle, $limit ) {
 	$query = new WP_Query(
 		array(
 			's'                => $needle,
@@ -206,7 +213,7 @@ function linkahead_search_content( $needle, $limit ) {
  * @param int $post_id Post ID.
  * @return int[]
  */
-function linkahead_translation_ids( $post_id ) {
+function link_ahead_translation_ids( $post_id ) {
 	$ids = array( (int) $post_id );
 	if ( function_exists( 'pll_get_post_translations' ) ) {
 		$ids = array_merge( $ids, array_map( 'intval', (array) pll_get_post_translations( $post_id ) ) );
@@ -224,19 +231,19 @@ function linkahead_translation_ids( $post_id ) {
  * @param string  $old_status Old status.
  * @param WP_Post $post       Post object.
  */
-function linkahead_on_publish( $new_status, $old_status, $post ) {
+function link_ahead_on_publish( $new_status, $old_status, $post ) {
 	$published = 'publish' === $new_status;
 	if ( $published === ( 'publish' === $old_status ) || ! $post instanceof WP_Post ) {
 		return;
 	}
-	$linking = linkahead_find_linking_posts( linkahead_translation_ids( $post->ID ) );
+	$linking = link_ahead_find_linking_posts( link_ahead_translation_ids( $post->ID ) );
 	if ( ! $linking ) {
 		return;
 	}
 	foreach ( $linking as $id ) {
 		clean_post_cache( $id );
 	}
-	linkahead_purge_page_caches( $linking );
+	link_ahead_purge_linking_pages( $linking );
 
 	if ( ! $published ) {
 		/**
@@ -262,7 +269,7 @@ function linkahead_on_publish( $new_status, $old_status, $post ) {
 	 */
 	do_action( 'link_ahead_target_published', $post->ID, $linking );
 }
-add_action( 'transition_post_status', 'linkahead_on_publish', 10, 3 );
+add_action( 'transition_post_status', 'link_ahead_on_publish', 10, 3 );
 
 /**
  * Purges the cached pages of the linking posts in common page-cache plugins.
@@ -273,7 +280,7 @@ add_action( 'transition_post_status', 'linkahead_on_publish', 10, 3 );
  *
  * @param int[] $post_ids Posts whose cached pages are outdated.
  */
-function linkahead_purge_page_caches( array $post_ids ) {
+function link_ahead_purge_linking_pages( array $post_ids ) {
 	/**
 	 * Filters whether Link Ahead purges page caches of linking posts.
 	 *

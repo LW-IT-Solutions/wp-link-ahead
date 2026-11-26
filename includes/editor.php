@@ -13,33 +13,33 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Loads the format script and its translations in the block editor.
  */
-function linkahead_enqueue_editor() {
+function link_ahead_enqueue_editor() {
 	$handle = 'link-ahead-editor';
 	wp_enqueue_script(
 		$handle,
-		plugins_url( 'assets/editor.js', LINKAHEAD_FILE ),
+		plugins_url( 'assets/editor.js', LINK_AHEAD_FILE ),
 		array( 'wp-api-fetch', 'wp-components', 'wp-data', 'wp-element', 'wp-i18n', 'wp-rich-text', 'wp-block-editor', 'wp-url' ),
-		LINKAHEAD_VERSION,
+		LINK_AHEAD_VERSION,
 		true
 	);
 	wp_set_script_translations( $handle, 'link-ahead' );
-	linkahead_enqueue_editor_style();
+	link_ahead_enqueue_editor_style();
 }
-add_action( 'enqueue_block_editor_assets', 'linkahead_enqueue_editor' );
+add_action( 'enqueue_block_editor_assets', 'link_ahead_enqueue_editor' );
 
 /**
  * The same small stylesheet serves the popover (outer editor frame) and the
  * dotted underline of placeholders (content iframe). Front end stays untouched.
  */
-function linkahead_enqueue_editor_style() {
+function link_ahead_enqueue_editor_style() {
 	if ( ! is_admin() ) {
 		return;
 	}
 	wp_enqueue_style(
 		'link-ahead-editor',
-		plugins_url( 'assets/editor.css', LINKAHEAD_FILE ),
+		plugins_url( 'assets/editor.css', LINK_AHEAD_FILE ),
 		array(),
-		LINKAHEAD_VERSION
+		LINK_AHEAD_VERSION
 	);
 }
-add_action( 'enqueue_block_assets', 'linkahead_enqueue_editor_style' );
+add_action( 'enqueue_block_assets', 'link_ahead_enqueue_editor_style' );

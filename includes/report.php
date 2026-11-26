@@ -12,30 +12,30 @@
 defined( 'ABSPATH' ) || exit;
 
 /** Maximum number of posts the report scans. */
-const LINKAHEAD_REPORT_LIMIT = 500;
+const LINK_AHEAD_REPORT_LIMIT = 500;
 
 /**
  * Registers the report page.
  */
-function linkahead_admin_menu() {
+function link_ahead_admin_menu() {
 	add_management_page(
 		__( 'Link Ahead', 'link-ahead' ),
 		__( 'Link Ahead', 'link-ahead' ),
 		'edit_others_posts',
 		'link-ahead',
-		'linkahead_render_report'
+		'link_ahead_render_report'
 	);
 }
-add_action( 'admin_menu', 'linkahead_admin_menu' );
+add_action( 'admin_menu', 'link_ahead_admin_menu' );
 
 /**
  * Collects all placeholders.
  *
  * @return array[] Rows with source, text and target.
  */
-function linkahead_collect() {
-	$anchors    = linkahead_search_content( 'data-link-ahead=', LINKAHEAD_REPORT_LIMIT );
-	$shortcodes = linkahead_search_content( '[link_ahead', LINKAHEAD_REPORT_LIMIT );
+function link_ahead_collect() {
+	$anchors    = link_ahead_search_content( 'data-link-ahead=', LINK_AHEAD_REPORT_LIMIT );
+	$shortcodes = link_ahead_search_content( '[link_ahead', LINK_AHEAD_REPORT_LIMIT );
 	$ids        = array_values( array_unique( array_merge( $anchors, $shortcodes ) ) );
 	$posts      = array_filter( array_map( 'get_post', $ids ) );
 
@@ -53,7 +53,7 @@ function linkahead_collect() {
 				);
 			}
 		}
-		foreach ( array_merge( $found, linkahead_shortcode_placeholders( $post->post_content ) ) as $placeholder ) {
+		foreach ( array_merge( $found, link_ahead_shortcode_placeholders( $post->post_content ) ) as $placeholder ) {
 			$rows[] = array(
 				'source' => (int) $post->ID,
 				'text'   => wp_strip_all_tags( $placeholder['text'] ),
@@ -61,7 +61,7 @@ function linkahead_collect() {
 			);
 		}
 	}
-	$truncated = count( $anchors ) >= LINKAHEAD_REPORT_LIMIT || count( $shortcodes ) >= LINKAHEAD_REPORT_LIMIT;
+	$truncated = count( $anchors ) >= LINK_AHEAD_REPORT_LIMIT || count( $shortcodes ) >= LINK_AHEAD_REPORT_LIMIT;
 	return array( $rows, $truncated );
 }
 
@@ -71,7 +71,7 @@ function linkahead_collect() {
  * @param int $target_id Target post ID.
  * @return array{label: string}
  */
-function linkahead_target_state( $target_id ) {
+function link_ahead_target_state( $target_id ) {
 	$post = get_post( $target_id );
 	if ( ! $post ) {
 		return array( 'label' => __( 'Missing – stays text', 'link-ahead' ) );
@@ -100,11 +100,11 @@ function linkahead_target_state( $target_id ) {
 /**
  * Renders the report page.
  */
-function linkahead_render_report() {
+function link_ahead_render_report() {
 	if ( ! current_user_can( 'edit_others_posts' ) ) {
 		return;
 	}
-	list( $rows, $truncated ) = linkahead_collect();
+	list( $rows, $truncated ) = link_ahead_collect();
 	?>
 	<div class="wrap">
 		<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
@@ -113,7 +113,7 @@ function linkahead_render_report() {
 			<div class="notice notice-warning inline"><p>
 				<?php
 				/* translators: %d: number of posts scanned. */
-				echo esc_html( sprintf( __( 'Only the %d most recent posts with placeholders were scanned.', 'link-ahead' ), LINKAHEAD_REPORT_LIMIT ) );
+				echo esc_html( sprintf( __( 'Only the %d most recent posts with placeholders were scanned.', 'link-ahead' ), LINK_AHEAD_REPORT_LIMIT ) );
 				?>
 			</p></div>
 		<?php endif; ?>
@@ -131,8 +131,8 @@ function linkahead_render_report() {
 				<?php foreach ( $rows as $row ) : ?>
 					<?php
 					// Visitors of a translated post get the translation in its language, so its state counts.
-					$target = linkahead_translated_id( $row['target'], $row['source'] );
-					$state  = linkahead_target_state( $target );
+					$target = link_ahead_translated_id( $row['target'], $row['source'] );
+					$state  = link_ahead_target_state( $target );
 					?>
 					<tr>
 						<td><a href="<?php echo esc_url( (string) get_edit_post_link( $row['source'] ) ); ?>"><?php echo esc_html( get_the_title( $row['source'] ) ); ?></a></td>

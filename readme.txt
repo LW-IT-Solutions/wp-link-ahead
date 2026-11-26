@@ -4,7 +4,7 @@ Tags: internal links, scheduled posts, editorial, series, polylang
 Requires at least: 6.5
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.1.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,7 +20,7 @@ Link Ahead solves this with a placeholder link:
 * Until the target is published, visitors see plain text. The address of the unpublished post is never output.
 * From the moment the target is published, the same text is a normal link to it.
 * With Polylang or WPML, a placeholder resolves to the translation in the language of the current post.
-* **Tools → Link Ahead** lists every placeholder, including shortcodes, with its source post and the current state of the target in the language of that post: scheduled, published, still a draft, private, in the trash or missing.
+* **Tools → Link Ahead** lists the placeholders, including shortcodes, in the posts you can edit, with the source post and the current state of the target in the language of that post: scheduled, published, still a draft, private, in the trash or missing. It reads up to the 500 most recent posts that contain placeholders and says so when there are more.
 
 = How it works =
 
@@ -34,7 +34,7 @@ For the classic editor there is a shortcode: `[link_ahead id="123"]link text[/li
 
 A page cache may still hold the old copy of a linking post, with plain text where the link should now be, or with a link to a target that was unpublished again. When a target is published, or a published target is set back to draft, private, scheduled or trash, Link Ahead therefore:
 
-* clears the object cache of every post that links to it,
+* clears the object cache of the posts that link to it (up to 200, the most recent first),
 * asks these page caches to purge the linking posts, if they are active: LiteSpeed Cache, WP Super Cache, W3 Total Cache, WP Rocket, WP Fastest Cache and Cache Enabler (only their public purge functions or actions are used),
 * fires the action `link_ahead_target_published( $post_id, $linking_ids )`, or `link_ahead_target_unpublished( $post_id, $linking_ids )`, so other caches can purge exactly those pages. The actions only fire if at least one post links to the target.
 
@@ -74,6 +74,11 @@ A page cache is most likely serving an older copy. Purge the page cache or wait 
 2. Tools → Link Ahead lists all placeholders and their targets.
 
 == Changelog ==
+
+= 0.1.1 =
+* With WPML, a placeholder resolves to the translation in the language of the post that contains it, also in the report under Tools.
+* The readme states the limits of the report (500 posts) and of the cache purge (200 linking posts).
+* One prefix for all PHP functions and constants (link_ahead_). Shortcode, actions, filter and stored markup are unchanged.
 
 = 0.1.0 =
 * First version: placeholder format for the block editor, rendering on the front end, Polylang and WPML support, shortcode, report under Tools.

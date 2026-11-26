@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Link Ahead
  * Description:       Link to scheduled or draft posts today. The link stays plain text until the target is published, then it turns into a real link on its own.
- * Version:           0.1.0
+ * Version:           0.1.1
  * Requires at least: 6.5
  * Requires PHP:      7.4
  * Author:            LW IT Solutions
@@ -16,8 +16,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LINKAHEAD_VERSION', '0.1.0' );
-define( 'LINKAHEAD_FILE', __FILE__ );
+define( 'LINK_AHEAD_VERSION', '0.1.1' );
+define( 'LINK_AHEAD_FILE', __FILE__ );
 
 require_once __DIR__ . '/includes/render.php';
 require_once __DIR__ . '/includes/editor.php';
