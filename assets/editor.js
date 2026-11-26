@@ -169,6 +169,8 @@
 			{ className: 'link-ahead-picker' },
 			el( components.TextControl, {
 				label: __( 'Find a scheduled or draft post', 'link-ahead' ),
+				help: __( 'Searches the titles of scheduled, draft and pending posts and pages.', 'link-ahead' ),
+				type: 'search',
 				value: term,
 				onChange: setTerm,
 				__nextHasNoMarginBottom: true,
@@ -195,8 +197,9 @@
 											el( 'strong', null, titleOf( item ) ),
 											el(
 												'span',
-												null,
-												item.typeLabel + ' · ' + statusText( item )
+												{ className: 'link-ahead-picker__meta' },
+												el( 'span', { className: 'link-ahead-status is-' + item.status }, statusText( item ) ),
+												el( 'span', { className: 'link-ahead-type' }, item.typeLabel )
 											)
 										)
 									);
@@ -204,6 +207,7 @@
 							: el(
 									'li',
 									{ className: 'link-ahead-picker__empty' },
+									el( 'span', { className: 'dashicons dashicons-calendar-alt', 'aria-hidden': 'true' } ),
 									__( 'No unpublished posts found.', 'link-ahead' )
 							  )
 				  )
@@ -244,7 +248,7 @@
 									null,
 									el( 'strong', null, titleOf( item ) ),
 									el( 'br' ),
-									statusText( item )
+									el( 'span', { className: 'link-ahead-status is-' + item.status }, statusText( item ) )
 							  )
 							: sprintf(
 									/* translators: %s: post ID. */

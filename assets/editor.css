@@ -4,8 +4,18 @@
 	text-underline-offset: 0.2em;
 }
 
+/* In the editor canvas a placeholder is tinted, so it stands out from normal links and text. */
+.editor-styles-wrapper .link-ahead,
+.block-editor-block-list__layout .link-ahead {
+	border-radius: 2px;
+	background: rgba(56, 88, 233, 0.1);
+	box-shadow: 0 0 0 1px rgba(56, 88, 233, 0.1);
+	text-decoration-color: var(--wp-admin-theme-color, #3858e9);
+}
+
 .link-ahead-popover .components-popover__content {
 	width: 320px;
+	max-width: calc(100vw - 32px);
 	padding: 12px;
 }
 
@@ -21,19 +31,69 @@
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
+	gap: 4px;
 	width: 100%;
 	height: auto;
+	min-height: 40px;
 	padding: 6px 8px;
 	text-align: left;
 	white-space: normal;
 }
 
-.link-ahead-picker__item span,
+.link-ahead-picker__item.components-button:hover {
+	background: #f0f6fc;
+}
+
+.link-ahead-picker__meta {
+	display: flex;
+	font-weight: 400;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.link-ahead-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+	color: #1e1e1e;
+}
+
+.link-ahead-status::before {
+	content: "";
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #757575;
+}
+
+.link-ahead-status.is-future::before { background: #2271b1; }
+.link-ahead-status.is-pending::before { background: #dba617; }
+.link-ahead-status.is-draft::before { background: #8c8f94; }
+.link-ahead-status.is-publish::before { background: #00a32a; }
+
+.link-ahead-type {
+	padding: 0 6px;
+	border-radius: 2px;
+	background: #f0f0f0;
+	font-size: 11px;
+	color: #50575e;
+}
+
 .link-ahead-picker__empty {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 4px;
 	font-size: 12px;
 	color: #50575e;
 }
 
 .link-ahead-current p {
 	margin: 0 0 12px;
+}
+
+.link-ahead-current .link-ahead-status {
+	margin-top: 4px;
 }

@@ -4,7 +4,7 @@ Tags: internal links, scheduled posts, editorial, series, polylang
 Requires at least: 6.5
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 0.1.1
+Stable tag: 0.2.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,15 @@ A page cache is most likely serving an older copy. Purge the page cache or wait 
 2. Tools → Link Ahead lists all placeholders and their targets.
 
 == Changelog ==
+
+= 0.2.0 =
+* Tools → Link Ahead opens with tiles for all, waiting, linked and placeholders that need attention, plus filter views for each group.
+* A timeline shows when the waiting links turn on, with date, relative time and number of placeholders per target.
+* Every state has a colored badge with an icon; placeholders that need attention are listed first, each with a short hint what to do.
+* Empty report: a short guide how to add the first placeholder.
+* The link picker in the editor shows the status as a colored marker and the post type as a label; placeholders are tinted in the editor canvas.
+* Narrow screens: the report table turns into stacked cards, filter links are at least 40 px high.
+* Front end, stored markup and cache purging are unchanged.
 
 = 0.1.1 =
 * With WPML, a placeholder resolves to the translation in the language of the post that contains it, also in the report under Tools.
