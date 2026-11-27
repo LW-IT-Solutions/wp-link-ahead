@@ -179,6 +179,124 @@ function link_ahead_report_assets( $hook ) {
 		return;
 	}
 	wp_enqueue_style( 'link-ahead-report', plugins_url( 'assets/report.css', LINK_AHEAD_FILE ), array( 'dashicons' ), LINK_AHEAD_VERSION );
+	wp_enqueue_script( 'link-ahead-report', plugins_url( 'assets/report.js', LINK_AHEAD_FILE ), array(), LINK_AHEAD_VERSION, true );
+	wp_localize_script(
+		'link-ahead-report',
+		'linkAheadReport',
+		array(
+			'search'  => __( 'Search posts, link texts and targets', 'link-ahead' ),
+			/* translators: 1: placeholders shown, 2: all placeholders */
+			'shown'   => __( 'Placeholders shown: %1$d of %2$d', 'link-ahead' ),
+			/* translators: %s: title of the target post */
+			'target'  => __( 'Only placeholders that point to "%s".', 'link-ahead' ),
+			'showAll' => __( 'Show all', 'link-ahead' ),
+			'none'    => __( 'No placeholder matches.', 'link-ahead' ),
+		)
+	);
+}
+
+/**
+ * Ring chart of the groups (inline SVG): linked, waiting, needs attention. Each segment is focusable and names
+ * its count; the tiles next to it carry the same numbers as text.
+ *
+ * @param array $counts Counts per group.
+ */
+function link_ahead_ring( array $counts ) {
+	if ( ! $counts['all'] ) {
+		return;
+	}
+	$parts  = array(
+		'linked'    => __( 'Linked', 'link-ahead' ),
+		'waiting'   => __( 'Waiting', 'link-ahead' ),
+		'attention' => __( 'Needs attention', 'link-ahead' ),
+	);
+	$r      = 44;
+	$circ   = 2 * M_PI * $r;
+	$offset = 0.0;
+	$gap    = count( array_filter( array_intersect_key( $counts, $parts ) ) ) > 1 ? 2 : 0;
+	$ready  = (int) round( ( $counts['linked'] + $counts['waiting'] ) / $counts['all'] * 100 );
+	?>
+	<figure class="link-ahead-ring">
+		<svg viewBox="0 0 110 110" role="group" aria-label="<?php esc_attr_e( 'Placeholders by state', 'link-ahead' ); ?>">
+			<circle class="link-ahead-ring-track" cx="55" cy="55" r="<?php echo esc_attr( (string) $r ); ?>"></circle>
+			<?php foreach ( $parts as $key => $label ) : ?>
+				<?php
+				if ( ! $counts[ $key ] ) {
+					continue;
+				}
+				$len = $counts[ $key ] / $counts['all'] * $circ;
+				/* translators: 1: group such as "Waiting", 2: number of placeholders */
+				$text = sprintf( __( '%1$s: %2$s', 'link-ahead' ), $label, number_format_i18n( $counts[ $key ] ) );
+				?>
+				<circle class="link-ahead-ring-seg is-<?php echo esc_attr( $key ); ?>" cx="55" cy="55" r="<?php echo esc_attr( (string) $r ); ?>" tabindex="0" role="img" aria-label="<?php echo esc_attr( $text ); ?>"
+					stroke-dasharray="<?php echo esc_attr( round( max( 0.8, $len - $gap ), 2 ) . ' ' . round( $circ, 2 ) ); ?>" stroke-dashoffset="<?php echo esc_attr( (string) round( -$offset, 2 ) ); ?>"><title><?php echo esc_html( $text ); ?></title></circle>
+				<?php $offset += $len; ?>
+			<?php endforeach; ?>
+		</svg>
+		<figcaption><strong><?php echo esc_html( $ready ); ?>&nbsp;%</strong><span><?php esc_html_e( 'linked or scheduled', 'link-ahead' ); ?></span></figcaption>
+	</figure>
+	<?php
+}
+
+/**
+ * What to do about each placeholder that needs attention, with a link to the place where it is done.
+ *
+ * @param array[] $rows Report rows.
+ */
+function link_ahead_fix_list( array $rows ) {
+	$items = array();
+	foreach ( $rows as $row ) {
+		if ( 'attention' !== $row['state']['group'] ) {
+			continue;
+		}
+		$key    = $row['state']['key'];
+		$target = get_post( $row['target_id'] );
+		$link   = '';
+		$label  = '';
+		if ( 'trash' === $key && $target && current_user_can( 'edit_post', $target->ID ) ) {
+			$link  = admin_url( 'edit.php?post_status=trash&post_type=' . $target->post_type );
+			$label = __( 'Open the trash', 'link-ahead' );
+		} elseif ( in_array( $key, array( 'unscheduled', 'private', 'other' ), true ) && $target && current_user_can( 'edit_post', $target->ID ) ) {
+			$link  = (string) get_edit_post_link( $target->ID );
+			$label = 'unscheduled' === $key ? __( 'Schedule the target', 'link-ahead' ) : __( 'Edit the target', 'link-ahead' );
+		} elseif ( current_user_can( 'edit_post', $row['source'] ) ) {
+			$link  = (string) get_edit_post_link( $row['source'] );
+			$label = __( 'Edit the placeholder', 'link-ahead' );
+		}
+		$items[] = array( $row, $link, $label );
+	}
+	if ( ! $items ) {
+		return;
+	}
+	?>
+	<section class="link-ahead-fix" aria-labelledby="link-ahead-fix-title">
+		<h2 id="link-ahead-fix-title"><span class="dashicons dashicons-admin-tools" aria-hidden="true"></span> <?php esc_html_e( 'To fix', 'link-ahead' ); ?> <span class="link-ahead-fix-n"><?php echo esc_html( number_format_i18n( count( $items ) ) ); ?></span></h2>
+		<p class="link-ahead-fix-lead"><?php esc_html_e( 'These placeholders stay plain text for visitors until they are fixed.', 'link-ahead' ); ?></p>
+		<ol>
+			<?php foreach ( $items as $item ) : ?>
+				<?php $row = $item[0]; ?>
+				<li class="is-<?php echo esc_attr( $row['state']['key'] ); ?>">
+					<span class="link-ahead-badge is-<?php echo esc_attr( $row['state']['key'] ); ?>"><span class="dashicons dashicons-<?php echo esc_attr( link_ahead_state_icon( $row['state']['key'] ) ); ?>" aria-hidden="true"></span><?php echo esc_html( $row['state']['label'] ); ?></span>
+					<span class="link-ahead-fix-what">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: 1: link text, 2: title of the post that contains the placeholder */
+								__( '"%1$s" in %2$s', 'link-ahead' ),
+								$row['text'],
+								get_the_title( $row['source'] )
+							)
+						);
+						?>
+					</span>
+					<?php if ( '' !== $item[1] ) : ?>
+						<a class="button button-small" href="<?php echo esc_url( $item[1] ); ?>"><?php echo esc_html( $item[2] ); ?></a>
+					<?php endif; ?>
+				</li>
+			<?php endforeach; ?>
+		</ol>
+	</section>
+	<?php
 }
 add_action( 'admin_enqueue_scripts', 'link_ahead_report_assets' );
 
@@ -310,21 +428,24 @@ function link_ahead_render_report() {
 				<?php endif; ?>
 			</div>
 		<?php else : ?>
+			<div class="link-ahead-overview">
+			<?php link_ahead_ring( $counts ); ?>
 			<dl class="link-ahead-tiles">
 				<?php foreach ( $tiles as $link_ahead_key => $link_ahead_tile ) : ?>
 					<div class="link-ahead-tile is-<?php echo esc_attr( $link_ahead_key ); ?>">
 						<dt><span class="dashicons dashicons-<?php echo esc_attr( $link_ahead_tile[1] ); ?>" aria-hidden="true"></span><?php echo esc_html( $link_ahead_tile[0] ); ?></dt>
-						<dd><?php echo esc_html( number_format_i18n( $counts[ $link_ahead_key ] ) ); ?><span><?php echo esc_html( $link_ahead_tile[2] ); ?></span></dd>
+						<dd><span class="link-ahead-num" data-la-count="<?php echo esc_attr( (string) $counts[ $link_ahead_key ] ); ?>"><?php echo esc_html( number_format_i18n( $counts[ $link_ahead_key ] ) ); ?></span><span><?php echo esc_html( $link_ahead_tile[2] ); ?></span></dd>
 					</div>
 				<?php endforeach; ?>
 			</dl>
+			</div>
 
 			<?php if ( $timeline['items'] ) : ?>
 				<section class="link-ahead-timeline" aria-labelledby="link-ahead-timeline-title">
 					<h2 id="link-ahead-timeline-title"><?php esc_html_e( 'When the waiting links turn on', 'link-ahead' ); ?></h2>
-					<div class="link-ahead-axis" aria-hidden="true">
-						<span class="link-ahead-axis-start"><?php esc_html_e( 'Today', 'link-ahead' ); ?></span>
-						<span class="link-ahead-axis-end">
+					<div class="link-ahead-axis">
+						<span class="link-ahead-axis-start" aria-hidden="true"><?php esc_html_e( 'Today', 'link-ahead' ); ?></span>
+						<span class="link-ahead-axis-end" aria-hidden="true">
 							<?php
 							/* translators: %d: number of days. */
 							echo esc_html( sprintf( _n( '+%d day', '+%d days', $timeline['days'], 'link-ahead' ), $timeline['days'] ) );
@@ -332,12 +453,16 @@ function link_ahead_render_report() {
 						</span>
 						<?php foreach ( $timeline['items'] as $link_ahead_i => $link_ahead_item ) : ?>
 							<?php $link_ahead_pos = min( 100, max( 0, ( $link_ahead_item['time'] - time() ) / ( $timeline['days'] * DAY_IN_SECONDS ) * 100 ) ); ?>
-							<span class="link-ahead-dot" style="<?php echo esc_attr( 'left:' . round( $link_ahead_pos, 2 ) . '%' ); ?>"><?php echo esc_html( number_format_i18n( $link_ahead_i + 1 ) ); ?></span>
+							<?php
+							/* translators: 1: number on the timeline, 2: post title, 3: date and time */
+							$link_ahead_dot_text = sprintf( __( '%1$s. %2$s, %3$s', 'link-ahead' ), number_format_i18n( $link_ahead_i + 1 ), $link_ahead_item['title'], wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $link_ahead_item['time'] ) );
+							?>
+							<a class="link-ahead-dot<?php echo esc_attr( $link_ahead_pos > 80 ? ' is-right' : ( $link_ahead_pos < 20 ? ' is-left' : '' ) ); ?>" href="<?php echo esc_attr( '#link-ahead-date-' . ( $link_ahead_i + 1 ) ); ?>" style="<?php echo esc_attr( 'left:' . round( $link_ahead_pos, 2 ) . '%' ); ?>" data-la-target="<?php echo esc_attr( (string) $link_ahead_item['id'] ); ?>" data-la-title="<?php echo esc_attr( $link_ahead_item['title'] ); ?>" aria-label="<?php echo esc_attr( $link_ahead_dot_text ); ?>"><?php echo esc_html( number_format_i18n( $link_ahead_i + 1 ) ); ?><span class="link-ahead-dot-tip" aria-hidden="true"><?php echo esc_html( $link_ahead_dot_text ); ?></span></a>
 						<?php endforeach; ?>
 					</div>
 					<ol class="link-ahead-dates">
-						<?php foreach ( $timeline['items'] as $link_ahead_item ) : ?>
-							<li>
+						<?php foreach ( $timeline['items'] as $link_ahead_i => $link_ahead_item ) : ?>
+							<li id="<?php echo esc_attr( 'link-ahead-date-' . ( $link_ahead_i + 1 ) ); ?>" tabindex="-1">
 								<strong><?php echo esc_html( $link_ahead_item['title'] ); ?></strong>
 								<span>
 									<?php
@@ -358,16 +483,19 @@ function link_ahead_render_report() {
 				</section>
 			<?php endif; ?>
 
+			<?php link_ahead_fix_list( $rows ); ?>
+
 			<ul class="subsubsub">
 				<?php $link_ahead_n = 0; ?>
 				<?php foreach ( $views as $link_ahead_key => $link_ahead_label ) : ?>
 					<li>
 						<?php echo $link_ahead_n++ ? ' | ' : ''; ?>
-						<a href="<?php echo esc_url( 'all' === $link_ahead_key ? $base_url : add_query_arg( 'state', $link_ahead_key, $base_url ) ); ?>"<?php echo $view === $link_ahead_key ? ' class="current" aria-current="page"' : ''; ?>><?php echo esc_html( $link_ahead_label ); ?> <span class="count">(<?php echo esc_html( number_format_i18n( $counts[ $link_ahead_key ] ) ); ?>)</span></a>
+						<a data-la-view="<?php echo esc_attr( $link_ahead_key ); ?>" href="<?php echo esc_url( 'all' === $link_ahead_key ? $base_url : add_query_arg( 'state', $link_ahead_key, $base_url ) ); ?>"<?php echo $view === $link_ahead_key ? ' class="current" aria-current="page"' : ''; ?>><?php echo esc_html( $link_ahead_label ); ?> <span class="count">(<?php echo esc_html( number_format_i18n( $counts[ $link_ahead_key ] ) ); ?>)</span></a>
 					</li>
 				<?php endforeach; ?>
 			</ul>
 			<div class="clear"></div>
+			<div class="link-ahead-tools" data-la-tools data-la-view-now="<?php echo esc_attr( $view ); ?>" hidden></div>
 
 			<?php if ( ! $shown ) : ?>
 				<p class="link-ahead-none"><?php esc_html_e( 'No placeholders in this view.', 'link-ahead' ); ?></p>
@@ -386,7 +514,7 @@ function link_ahead_render_report() {
 						$state  = $row['state'];
 						$hint   = link_ahead_state_hint( $state['key'] );
 						?>
-						<tr>
+						<tr data-la-group="<?php echo esc_attr( $state['group'] ); ?>" data-la-target="<?php echo esc_attr( (string) $target ); ?>">
 							<td data-label="<?php esc_attr_e( 'In post', 'link-ahead' ); ?>"><a href="<?php echo esc_url( (string) get_edit_post_link( $row['source'] ) ); ?>"><?php echo esc_html( get_the_title( $row['source'] ) ); ?></a></td>
 							<td data-label="<?php esc_attr_e( 'Link text', 'link-ahead' ); ?>"><span class="link-ahead-text"><?php echo esc_html( $row['text'] ); ?></span></td>
 							<td data-label="<?php esc_attr_e( 'Target', 'link-ahead' ); ?>">

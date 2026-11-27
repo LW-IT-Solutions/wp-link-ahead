@@ -13,6 +13,7 @@
 	var useEffect = wp.element.useEffect;
 	var Fragment = wp.element.Fragment;
 	var __ = wp.i18n.__;
+	var _n = wp.i18n._n;
 	var sprintf = wp.i18n.sprintf;
 	var richText = wp.richText;
 	var components = wp.components;
@@ -53,6 +54,68 @@
 		}
 	}
 
+	/** "in 4 days" for a scheduled post, from its date in UTC; empty for anything else. */
+	function relative( item ) {
+		if ( 'future' !== item.status || ! item.date_gmt ) {
+			return '';
+		}
+		var diff = Date.parse( item.date_gmt + 'Z' ) - Date.now();
+		if ( ! ( diff > 0 ) ) {
+			return '';
+		}
+		var minutes = Math.max( 1, Math.round( diff / 60000 ) );
+		if ( minutes < 60 ) {
+			/* translators: %d: number of minutes until publication. */
+			return sprintf( _n( 'in %d minute', 'in %d minutes', minutes, 'link-ahead' ), minutes );
+		}
+		var hours = Math.round( minutes / 60 );
+		if ( hours < 48 ) {
+			/* translators: %d: number of hours until publication. */
+			return sprintf( _n( 'in %d hour', 'in %d hours', hours, 'link-ahead' ), hours );
+		}
+		var days = Math.round( hours / 24 );
+		/* translators: %d: number of days until publication. */
+		return sprintf( _n( 'in %d day', 'in %d days', days, 'link-ahead' ), days );
+	}
+
+	/** The title with the search term marked. */
+	function marked( title, term ) {
+		var needle = String( term || '' ).trim().toLowerCase();
+		var at = needle ? title.toLowerCase().indexOf( needle ) : -1;
+		if ( at < 0 ) {
+			return el( 'strong', null, title );
+		}
+		return el(
+			'strong',
+			null,
+			title.slice( 0, at ),
+			el( 'mark', { className: 'link-ahead-hit' }, title.slice( at, at + needle.length ) ),
+			title.slice( at + needle.length )
+		);
+	}
+
+	/** Arrow keys move between the search field and the results. */
+	function moveFocus( event ) {
+		if ( 'ArrowDown' !== event.key && 'ArrowUp' !== event.key ) {
+			return;
+		}
+		var items = Array.prototype.slice.call( event.currentTarget.querySelectorAll( '.link-ahead-picker__item' ) );
+		if ( ! items.length ) {
+			return;
+		}
+		var at = items.indexOf( event.target.ownerDocument.activeElement );
+		var next = 'ArrowDown' === event.key ? at + 1 : at - 1;
+		event.preventDefault();
+		if ( next < 0 ) {
+			var field = event.currentTarget.querySelector( 'input' );
+			if ( field ) {
+				field.focus();
+			}
+			return;
+		}
+		items[ Math.min( items.length - 1, next ) ].focus();
+	}
+
 	function titleOf( item ) {
 		var title = item.title && ( item.title.raw || item.title.rendered );
 		return title || __( '(no title)', 'link-ahead' );
@@ -74,7 +137,7 @@
 						per_page: 10,
 						context: 'edit',
 						exclude: exclude || undefined,
-						_fields: 'id,title,status,date',
+						_fields: 'id,title,status,date,date_gmt',
 					} ),
 				} )
 					.then( function ( items ) {
@@ -97,7 +160,7 @@
 			return apiFetch( {
 				path: addQueryArgs( type.path + '/' + id, {
 					context: 'edit',
-					_fields: 'id,title,status,date',
+					_fields: 'id,title,status,date,date_gmt',
 				} ),
 			} ).catch( function () {
 				return null;
@@ -166,10 +229,10 @@
 
 		return el(
 			'div',
-			{ className: 'link-ahead-picker' },
+			{ className: 'link-ahead-picker', onKeyDown: moveFocus },
 			el( components.TextControl, {
 				label: __( 'Find a scheduled or draft post', 'link-ahead' ),
-				help: __( 'Searches the titles of scheduled, draft and pending posts and pages.', 'link-ahead' ),
+				help: __( 'Searches the titles of scheduled, draft and pending posts and pages. Arrow keys move through the results.', 'link-ahead' ),
 				type: 'search',
 				value: term,
 				onChange: setTerm,
@@ -194,11 +257,12 @@
 													props.onSelect( item );
 												},
 											},
-											el( 'strong', null, titleOf( item ) ),
+											marked( titleOf( item ), term ),
 											el(
 												'span',
 												{ className: 'link-ahead-picker__meta' },
 												el( 'span', { className: 'link-ahead-status is-' + item.status }, statusText( item ) ),
+												relative( item ) ? el( 'span', { className: 'link-ahead-soon' }, relative( item ) ) : null,
 												el( 'span', { className: 'link-ahead-type' }, item.typeLabel )
 											)
 										)

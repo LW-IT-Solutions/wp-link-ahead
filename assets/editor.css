@@ -97,3 +97,25 @@
 .link-ahead-current .link-ahead-status {
 	margin-top: 4px;
 }
+
+/* 0.3.0: search hits and the time until a scheduled target is published */
+.link-ahead-picker .link-ahead-hit {
+	padding: 0 1px;
+	border-radius: 2px;
+	background: #fcf0c3;
+	color: inherit;
+}
+
+.link-ahead-soon {
+	padding: 0 6px;
+	border-radius: 2px;
+	background: #f0f6fc;
+	color: #0a4b78;
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.link-ahead-picker__item.components-button:focus-visible {
+	box-shadow: inset 0 0 0 2px var(--wp-admin-theme-color, #3858e9);
+	background: #f0f6fc;
+}

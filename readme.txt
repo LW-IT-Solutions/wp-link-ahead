@@ -4,7 +4,7 @@ Tags: internal links, scheduled posts, editorial, series, polylang
 Requires at least: 6.5
 Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,13 @@ A page cache is most likely serving an older copy. Purge the page cache or wait 
 2. Tools → Link Ahead lists all placeholders and their targets.
 
 == Changelog ==
+
+= 0.3.0 =
+* Report: a ring chart shows the share of linked, waiting and placeholders that need attention, with the share that is linked or scheduled in the middle; the tiles count up once (not with reduced motion).
+* Report: the dots on the timeline name their post and date on hover or focus, and choosing one shows only the placeholders that point to that post.
+* Report: "To fix" lists every placeholder that needs attention with a direct link to the step that fixes it (schedule the target, open the trash, edit the post).
+* Report: search over posts, link texts and targets with marked hits (shortcut /); the group links filter without reloading the page.
+* Editor: the search term is marked in the results, scheduled posts show how long until they are published, and the arrow keys move through the results.
 
 = 0.2.0 =
 * Tools → Link Ahead opens with tiles for all, waiting, linked and placeholders that need attention, plus filter views for each group.
